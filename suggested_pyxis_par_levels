@@ -1,0 +1,45 @@
+import pandas as pd
+import os
+
+# Setting Dynamic Paths
+base_dir = os.path.expanduser("~")  # User's home directory
+input_file = 'Downloads/raw_data_file.csv'  # Location of raw data
+output_file = 'Desktop/clean_finalized_data.csv'  # Output of cleaned data
+
+# Combine paths with the base directory
+input_file_path = os.path.join(base_dir, input_file)
+output_file_path = os.path.join(base_dir, output_file)
+
+# Load the CSV file
+data = pd.read_csv(file_path, encoding='latin1', low_memory=False)
+
+# Filter the dataframe for the required columns
+filtered_data = data[['Device', 'MedDescription', 'TransactionType', 'Quantity', 'TransactionDateTime']].copy()
+
+# Convert the Quantity to numeric, coercing errors to NaN
+filtered_data.loc[:, 'Quantity'] = pd.to_numeric(filtered_data['Quantity'], errors='coerce')
+
+# Convert the TransactionDateTime to datetime to extract the date
+filtered_data.loc[:, 'Date'] = pd.to_datetime(filtered_data['TransactionDateTime'], errors='coerce').dt.date
+
+# Group by Device, MedDescription, Date, and TransactionType, then sum the Quantity
+all_medications_grouped = filtered_data.groupby(['Device', 'MedDescription', 'Date', 'TransactionType'])['Quantity'].sum().reset_index()
+
+# Filter only 'Remove' transactions
+all_medications_remove = all_medications_grouped[all_medications_grouped['TransactionType'] == 'Remove']
+
+# Find the maximum quantity per device and medication
+max_quantity_all_medications = all_medications_remove.loc[all_medications_remove.groupby(['Device', 'MedDescription'])['Quantity'].idxmax()]
+
+# Add the new columns for Suggested Min (3 Days) and Suggested Max (10 Days)
+max_quantity_all_medications['Suggested Min'] = max_quantity_all_medications['Quantity'] * 3
+max_quantity_all_medications['Suggested Max'] = max_quantity_all_medications['Quantity'] * 10
+
+# Unneeded Columns
+del max_quantity_all_medications['TransactionType']
+
+# Save the results to a new CSV file
+max_quantity_all_medications.to_csv(output_file_path, index=False)
+
+# Confirmation message
+print(f"CSV file created successfully at {output_file_path}")
